@@ -1,0 +1,1659 @@
+\documentclass[9pt]{beamer}
+\usepackage[utf8]{inputenc}
+\usepackage{txfonts}
+\usepackage[english]{babel}
+\usepackage{xcolor}
+\usetheme{AnnArbor}
+\usecolortheme{beaver}
+
+\setbeamertemplate{headline}{}
+% \setbeamertemplate{frametitle}{\insertframetitle}
+\setbeamertemplate{navigation symbols}{}
+
+\setbeamertemplate{itemize item}{\scriptsize\raise1.25pt\hbox{\donotcoloroutermaths$\blacktriangleright$}}
+\setbeamertemplate{itemize subitem}{\tiny\raise1.5pt\hbox{\donotcoloroutermaths$\blacktriangleright$}}
+\setbeamertemplate{itemize subsubitem}{\tiny\raise1.5pt\hbox{\donotcoloroutermaths$\blacktriangleright$}}
+\setbeamertemplate{enumerate item}{\insertenumlabel.}
+\setbeamertemplate{enumerate subitem}{\insertenumlabel.\insertsubenumlabel}
+\setbeamertemplate{enumerate subsubitem}{\insertenumlabel.\insertsubenumlabel.\insertsubsubenumlabel}
+\setbeamertemplate{enumerate mini template}{\insertenumlabel}
+
+% \setbeamertemplate{itemize items}[square]
+% \setbeamertemplate{items}[square]
+
+
+
+\newcommand{\bluemph}[1]{\structure{\emph{#1}}}
+\newcommand{\redemph}[1]{\alert{\emph{#1}}}
+\newcommand{\bluebf}[1]{\structure{\textbf{#1}}}
+\newcommand{\redbf}[1]{\alert{\textbf{#1}}}
+
+\newcommand\denote[1]{\llbracket #1 \rrbracket}
+\newcommand\fesi{Fe-Si}
+
+%  Structure
+\newenvironment{remark}{\footnotesize \begin{description}\item[\emph{Remark}:]}{\end{description}}
+
+\title{Circuits in Coq: a tale of encodings}%
+\author{Thomas Braibant}
+\institute[Inria]{Inria}
+\date[11/2013]{GT Th\'eorie des types et r\'ealisabilit\'e}
+
+\setbeamercovered{transparent}
+%\setbeamerfont{frametitle}{size={\normalsize}}
+
+% \usepackage[T1]{fontenc}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{mathpartir}
+
+\usepackage{listings}
+\usepackage{graphicx}
+\definecolor{ltblue}{rgb}{0,0.4,0.4}
+\definecolor{dkblue}{rgb}{0,0.1,0.6}
+\definecolor{dkgreen}{rgb}{0,0.4,0}
+\definecolor{dkviolet}{rgb}{0.3,0,0.5}
+\definecolor{dkred}{rgb}{0.5,0,0}
+\usepackage{lstcoq}
+\usepackage{lstocaml}
+\usepackage{tikz}
+\usetikzlibrary{shapes,positioning,fit}
+
+\begin{document}
+% \newcommand \blue[1]{{\color{red!80!black}{#1}}}
+\newcommand \orange[1]{{\color{orange}{#1}}}
+% \newcommand \red[1]{{\color{red}{#1}}}
+% \newcommand \grey[1]{{\color{gray}{#1}}}
+% \newcommand \green[1]{{\color{violet}{#1}}}
+% \newcommand \white[1]{{\color{white}{#1}}}
+
+\newcommand\parenthesis[1] {
+  \begin{flushright}
+    {\scriptsize \redemph{{{{ #1}}}}}
+  \end{flushright}
+
+}
+
+
+\newcommand\plan[2]
+{
+\begin{frame}[plain]
+  \begin{center}
+    {\Huge  \sc #1} \\
+
+    \vspace{1cm}
+
+    #2
+\end{center}
+\end{frame}
+}
+\newcommand\eqdef{\triangleq}
+
+\tikzstyle{bubble} = [draw=dkred, very thick, rounded rectangle, inner
+sep=4pt, inner ysep=4pt, solid]
+
+\begin{frame}
+  \center 
+  \titlepage
+\end{frame} 
+
+
+\plan{Outline: Formalize and reason about circuits}{
+  \begin{itemize}
+  \item First encoding: graphical (categorical) approach
+  \item Second encoding: scaling up, handling variables properly
+  \item (if time permits): encodings of BDD libraries 
+  \end{itemize}
+
+  \pause
+
+  \alert{\bf (Bredth-first talk!)}
+}
+
+
+\begin{frame}
+  \frametitle{Formalising circuits in proof assistants}
+  \framesubtitle{(Circa 1985)}
+    
+  Representing circuits with predicates (or functions).
+  \begin{itemize}
+  \item Some definitions:
+    \begin{mathpar}
+      Xor(i_1,i_2,o) \eqdef (o = \neg (i_1 = i_2)) \and
+      Not(i,o) \eqdef (o = \neg i)
+    \end{mathpar}
+  \item<2->   Adding structure:
+    \only<2>{
+      \begin{columns}
+      \column{0.45\textwidth}
+          \begin{displaymath}
+            D(a,x) \wedge D(x,b)
+          \end{displaymath}
+      \column{0.45\textwidth}
+      \includegraphics[width=4cm]{figs/composition_hol}        
+      \end{columns}
+    }
+    \only<3>{
+      \begin{columns}
+      \column{0.45\textwidth}
+          \begin{displaymath}
+            \exists x, D(a,x) \wedge D(x,b)
+          \end{displaymath}
+      \column{0.45\textwidth}
+      \includegraphics[width=4cm]{figs/hiding_hol}        
+      \end{columns}
+    }    
+    \only<4->
+    {\begin{columns}
+      \column{0.45\textwidth}
+        \begin{block}{Composition}
+          \begin{displaymath}
+            D(a,x) \wedge D(x,b)
+          \end{displaymath}
+        \end{block}
+      \column{0.45\textwidth}
+        \begin{block}{Hiding}
+          \begin{displaymath}
+            \exists x, D(a,x) \wedge D(x,b)
+          \end{displaymath}
+        \end{block}
+    \end{columns}
+  }
+   
+\item<5-> Correctness proof: entailment of a specification. 
+  \begin{displaymath}
+    (\exists x, Xor(i_1,i_2,x) \wedge Not(x,o)) \implies (o = (i_1 = i_2))
+  \end{displaymath}
+
+  \end{itemize}
+\end{frame}
+
+
+
+\begin{frame}
+  \frametitle{Shallow-embeddings vs deep-embeddings}
+
+  Using a shallow-embedding, there is no way to:
+  \begin{itemize}
+  \item restrict the quantification on \alert{circuits};
+  \item reason on the structure of the circuit in the proof assistant.
+  \end{itemize}
+  
+  \medskip \pause
+  
+  Move to deep-embeddings: 
+  \begin{itemize}
+  \item define a \alert{data structure for circuits};
+  \item define what's a circuit semantics (via an interpretation function);
+  \item prove that a device implements a given specification.
+  \end{itemize}
+  \parenthesis{No currents, unit delays}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{The graphical approach}
+  \renewenvironment{example}{\noindent\hrulefill\\}{\noindent\hrulefill\\}
+  \only<1>{
+  \begin{example}
+    \begin{tabular}[c]{cc}
+    \begin{minipage}[c]{0.4\linewidth}
+      \begin{center}
+        \includegraphics{figs/not}
+      \end{center}
+    \end{minipage}
+    & 
+    \begin{minipage}[c]{0.4\linewidth}
+      \begin{center}
+        \includegraphics{figs/and3}
+      \end{center}
+    \end{minipage}
+    
+    \\
+    {\tt Fork 2 $\rhd$ NOR}        
+    &
+    {\tt (AND $\&$ One 1) $\rhd$ AND}
+    \\
+    \texttt{Not} : \alert{ \tt circuit 1 1} &
+    \texttt{And3} : \alert{\tt circuit 3 1} \\      
+  \end{tabular}
+
+  \end{example}
+}
+
+\only<2>{
+  \begin{example}
+    \begin{center}
+      \includegraphics[height=3cm]{figs/register.pdf}
+    \end{center}
+  \end{example}}
+\end{frame}
+
+\newcommand\circuit[2]{\mathbb{C}~#1~#2}
+\begin{frame}[fragile]
+  \frametitle{A dependent type for circuits in Coq}
+
+  \begin{itemize}
+  \item   First version:
+    \begin{coq}
+      Inductive $\circuit{}{}$ : nat -> nat -> Type := ...
+    \end{coq}
+  \item Examples:\\
+    \begin{center}
+      \begin{tabular}{l@{\quad:\quad}l}
+        \texttt{Not} &
+        $\circuit{1}{1}$ \\
+        
+        \texttt{And3} &
+        $\circuit{3}{1}$\\
+        \texttt{Adder $n$} &  $\circuit{(2n+1)}{(n+1)}$\\
+      \end{tabular}
+    \end{center}
+    \pause
+  \item Does not give much structure! 
+    \begin{align*}
+      2n+1 &= n+n+1 \\
+      & = n+1+n \\
+      & = 1+n+n
+    \end{align*}
+  \end{itemize}
+  
+\end{frame}
+\newcommand\unit{{\bf 1}}
+\newcommand\zero{{\bf 0}}
+\newcommand\bool{\mathbb{B}}
+\newcommand\sumn[2]{#2 \cdot \unit_{\tt #1}}
+
+
+\begin{frame}[fragile]
+  \frametitle{A better dependent type for circuits in Coq}
+  \begin{itemize}
+  \item Let'suse arbitrary types as \alert{indexes} for the ports:
+  \begin{coq}
+Inductive $\circuit{}{}$ : Type -> Type -> Type := ...      
+\end{coq}
+\item For instance ($\unit$ is the unit type, and $\oplus$ is
+  disjoint-sum):
+  \begin{tabular}{l@{\quad:\quad}ll}
+    \texttt{Not} &
+    $\circuit{\unit}{\unit}$ &
+    \alert{semantics$(\unit \to \bool) \to (\unit \to \bool)$} \\
+    
+    \texttt{And3} &
+    $\circuit{(\unit{} \oplus{} \unit{}  \oplus{} \unit{})}{\unit{}}$& 
+    \alert{semantics $(\unit \oplus \unit \oplus \unit \to \bool) \to (\unit \to \bool)$} \\
+    \texttt{Adder $n$} &  $\circuit{(\sumn{}{n} \oplus \sumn{}{n} \oplus{} \unit{})}{(\sumn{}{n} \oplus \unit)}$     & \alert{...}
+  \end{tabular}
+\end{itemize}
+\pause
+\parenthesis{Unsurprising: circuits are morphisms between sets of ports}
+\end{frame}
+
+\begin{frame}\frametitle{Combinators}
+
+
+  \begin{itemize}
+  \item Composition: $\circuit{n}{m} \to \circuit{m}{p} \to\circuit{n}{p}$
+    
+
+  \item Product: $\circuit{n}{m} \to \circuit{p}{q} \to \circuit{(n\oplus p)}{(m\oplus q)}$
+
+  \item Trace: $\circuit{(n\oplus p)}{(m \oplus p)} \to \circuit{n}{m}$
+  \end{itemize}
+  \begin{center}
+      \includegraphics[width=0.7\linewidth]{figs/type}
+  \end{center}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Wiring}
+  \setbeamercovered{invisible}
+  \begin{itemize}
+  \item Nameless setting: wires have to be forked, reordered!
+  \item Could use symmetries and diagonals for wiring.
+
+    \pause
+
+  \item To tame complexity, use \alert{plugs}
+  \item A plug is a circuit of type $\circuit{n}{m}$ defined as a \alert{map} from $m$ to $n$
+
+    \pause
+  \item Examples
+    \begin{center}
+      \begin{tabular}{ccc}
+        (a) & (b) & (c) \\ 
+        \includegraphics[width=0.2\linewidth, height=1cm]{figs/plugs_b.pdf}&
+        \includegraphics[width=0.2\linewidth, height=1cm]{figs/plugs_a.pdf}&
+        \includegraphics[width=0.2\linewidth, height=1cm]{figs/plugs_c.pdf}\\
+        $\circuit{(n \oplus m)}{m}$ &
+        $\circuit{n}{(n\oplus n)}$ &
+        $\circuit{(n \oplus m \oplus p)}{(p \oplus (n \oplus n))}$ \\
+      \end{tabular}
+    \end{center}
+    \parenthesis{types must be read bottom-up}
+    \pause 
+    \begin{columns}[c]
+      \column{0.75 \linewidth}
+      \begin{itemize}
+      \item[a)] \coqe{fun (x : m) => inr n x}
+      \item[b)] \coqe{fun (x : n $\oplus$ n) => match x with inl e => e | inr e => e end}.
+        \vspace{-0.8em}
+      \item[c)]
+        \begin{coq}
+fun (x : p $\oplus$ (n $\oplus$ n)) => match x with
+| inl ep => inr (n $\oplus$ m) ep
+| inr (inl en) => inl p (inl m en)
+| inr (inr en) => inl p (inl m en)
+        \end{coq}
+      \end{itemize}
+      
+      \column{0.25\linewidth}
+      by \alert{proof-search}
+    \end{columns}
+  \end{itemize}
+\end{frame}
+
+\newcommand\data{\mathbb{T}}
+
+\begin{frame}[fragile]
+  \frametitle{So far, so good}
+  \begin{itemize}
+  \item \alert{Strongly typed} syntax (also, \alert{intrinsic approach})
+\begin{coq}
+Inductive $\mathbb{C}$  : Type -> Type -> Type :=
+| Atom : forall (n m : Type), atom n m -> $\mathbb{C}$ n m
+| Plug : forall (n m : Type) (f : m -> n), $\mathbb{C}$ n m
+| Ser   : forall (n m p : Type), $\mathbb{C}$ n m -> $\mathbb{C}$ m p -> $\mathbb{C}$ n p
+| Par   : forall (n m p q : Type), $\mathbb{C}$ n p -> $\mathbb{C}$ m q ->  $\mathbb{C}$ (n \oplus m) (p \oplus q)
+| Loop : forall (n m p : Type), $\mathbb{C}$ (n \oplus p) (m \oplus p) -> $\mathbb{C}$ n m.
+\end{coq}       
+
+\item   Semantics of a circuit of type $\circuit{n}{m}$ induces a \alert{relation} between $n
+  \rightarrow \data$ and $m \rightarrow \data$.
+  \begin{coq}
+Inductive sem: forall (n m: Type) (c: $\circuit{\tt n}{\tt m}$) -> (n -> $\data$) -> (m -> $\data$) -> Prop := ...
+\end{coq}
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Using isomorphisms}
+
+  \begin{itemize}
+  \item The semantics relates \alert{valuations}   (e.g.: $\unit \oplus \unit \to \bool$).
+    \pause
+  \item We need to reason \alert{up-to} type isomorphisms 
+  \item Examples:
+    \begin{mathpar}
+      \inferrule*{ }{ \unit\rightarrow \data \cong \data } \and
+      
+      \inferrule*{ A \rightarrow \data \cong \sigma \and B
+        \rightarrow \data \cong \tau } { A \oplus B \rightarrow \data
+        \cong (\sigma \times \tau) } \and
+      
+      \inferrule*{ }{ \zero \rightarrow \data \cong \unit } \and
+      
+    \end{mathpar}  
+    \pause
+  \item Use it to define specifications.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{An adder}
+
+  \begin{center}
+    \only<1>{\includegraphics[height=2cm]{figs/adder-1.pdf}}
+    \only<2->{\includegraphics[height=4cm]{figs/adder-2.pdf}}
+    \begin{displaymath}
+      s =  a + b \quad  t =  a + b + 1
+    \end{displaymath}
+  \end{center}
+  
+  \only<3>{
+  \begin{center}
+    \em Up-to isomorphisms, this circuit implements the addition of bitvectors of size $n$
+  \end{center}
+}
+
+\only<4>{ \alert{Problem:} there is too much entanglement
+  \begin{itemize}
+  \item spend lots of time on wiring
+  \item spend lots of time on basic stuff (reordering the \alert{context})
+  \end{itemize}
+}
+\end{frame}
+
+\plan{Diagramatic reasoning}
+{
+  \begin{itemize}
+  \item is appealing
+  \item yet, is not suited for ``real'' verification efforts
+  \item requires much boiler-plate
+  \end{itemize}
+
+  \vspace{1em}
+  {\bf variables are just too important}
+}
+
+\plan{Let's take binders seriously}
+{
+  \setbeamercovered{invisible}
+
+  Many ways to deal with nested binders
+  \begin{itemize}
+  \item Named variables
+  \item (Dependently typed) De Bruijn indices;
+  \item Locally nameless;
+  \item ...
+  \item<2> \alert{Parametric Higher-Order Abstract Syntax} (PHOAS)
+  \end{itemize}
+  \vspace{1em}
+  \uncover<2>{
+    \includegraphics[width=3cm]{figs/adam}
+}}
+
+
+\begin{frame}[fragile]
+  \frametitle{A PHOAS primer}
+  \begin{itemize}
+  \item Use Coq bindings to represent the bindings of the object language.
+    \newcommand\arrow{\ulcorner \to \urcorner}
+\begin{coq}
+Section t. 
+  Variable var: T -> Type.
+  
+  Inductive term : T -> Type :=
+  | Var: forall t, var t -> term t
+  | Abs: forall $\alpha$ $\beta$, (var $\alpha$ -> term $\beta$) -> term ($\alpha$ $\arrow$ $\beta$)
+  | App: forall $\alpha$ $\beta$, term ($\alpha$ $\arrow$ $\beta$) -> term $\alpha$ -> term $\beta$
+End t. 
+
+Definition Term := forall (var: T -> Type), term var. 
+\end{coq}
+\item Example: K.
+  \begin{coq}
+Definition K $\alpha$ $\beta$ : Term ($\alpha~\arrow~\beta~\arrow~\alpha$) := fun var => 
+  Abs (fun x => Abs (fun y => Var x)).
+\end{coq}
+
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{A PHOAS primer (cont.)}
+  \begin{itemize}
+  \item First example: count the size of a term.
+    \begin{coq}
+Fixpoint size t (e : term (fun _ => unit) t) : nat := 
+match e with
+| Var t v => 1
+| Abs alpha beta e => 1 + size (e tt)
+| App _ _ e f => 1+ size e + size f
+end.
+\end{coq}
+\pause
+\item Second example: compute the denotation of a term.
+    \begin{coq}
+Fixpoint denote t (e : term $\llbracket \cdot \rrbracket$ t) : $\llbracket$t$\rrbracket$ :=
+match e with
+| Var t v => v
+| Abs alpha beta e => fun x => denote (e x)
+| App _ _ e f => (denote e) (denote f)
+end.
+\end{coq}
+\pause
+\item An \alert{intrinsic approach} (strongly typed syntax vs. syntax + typing judgement)
+\item Program transformations are easier to implement (and prove!) 
+\\
+  \parenthesis{with one caveat}
+\end{itemize}
+\end{frame}
+
+\plan{Back to circuit generators}
+{\textbf{with PHOAS}}
+
+\begin{frame}{Fe-Si}
+  \framesubtitle{Joint work with A. Chlipala}
+  Fe-Si (Featherweigth synthesis)
+  \begin{itemize}
+  \item an \alert{E}mbedded \alert{D}omain \alert{S}pecific \alert{L}anguage in Coq
+  \item an idealized subset of the Bluespec hardware description language (MIT, industrial)
+  \item describe circuits in ``term rewriting systems'' style
+  \item semantics based on guarded atomic actions
+  \item a ``surface'' language for circuit generators;
+  \item with a compiler to a more ``primitive'' one (RTL)
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Why do we need both a compiler and meta-programming?}
+  \setbeamercovered{invisible}
+  \begin{center} 
+    \begin{tikzpicture}
+      \draw (0,0) node[bubble,anchor=east] (n1) {Coq + Fe-Si}  
+      (2,0) node[bubble,anchor=center] (n2) {Fe-Si};
+      \draw[thick,->] (n1.east) -- (n2.west) node[pos=0.5](mpd){};
+      \pause   
+      
+      \node[bubble,anchor=center, below=1 of mpd] (mp) {meta-programming};
+      \draw[->] (mp) -- (mpd.center);
+      \pause
+      \draw (4,0) node[bubble,anchor=west] (n3) {RTL};
+      \draw[thick,->] (n2.east) -- (n3.west) node[pos=0.5](cd){};
+\pause
+      \node[bubble,anchor=center, below=1 of cd] (c) {compiler};
+      \draw[->] (c) -- (cd.center);
+\pause
+\node[draw=dkred, thick, dashed,inner sep=10pt,outer sep=2pt,fit=(n1)
+(n2) (n3) (c) (mp)] (bb) {};
+\node[anchor=south east,inner sep=1pt] at (bb.north east) 
+    {Coq};
+    \end{tikzpicture}
+  \end{center}
+   \only<4->{\parenthesis{Our flavor of RTL is defined in terms of combinational logic
+    and registers}}
+\end{frame}
+
+\begin{frame}
+  \frametitle{To sum up}
+  
+  \begin{itemize}
+  \item  High-level languages have more structure. 
+    \parenthesis{easier for verification.}
+  \item Certified compilers are semantics preserving.
+    \parenthesis{transport verification to low-level languages. }
+  \item Extra difficulty in our case: nested binders.
+    \parenthesis{solved using PHOAS.}
+  \end{itemize}
+  
+\end{frame}
+
+
+\begin{frame}[fragile]
+  \frametitle{Fe-Si, informally}
+  \begin{itemize}
+  \item Based on a \alert{monad}
+  \item Base constructs: bind and return
+    \begin{coq}
+Definition hadd (a b: Var B) : action [] (B $\otimes$ B) :=
+$\quad$do carry <- ret (andb a b); 
+$\quad$do sum   $\,$<- ret (xorb a b);
+$\quad$ret (carry, sum).  
+\end{coq}
+\pause
+\item Set of memory elements to hold mutable state
+\begin{coq}
+Definition count n : action [Reg (Int n)] (Int n) :=
+$\quad$do x <- !member_0;
+$\quad$do _ <- member_0 ::= x + 1;
+$\quad$ret x. 
+\end{coq}
+\pause
+\item Control-flow constructions
+\begin{coq}
+Definition count n (tick: Var B) : action [Reg (Int n)] (Int n) :=
+$\quad$do x <- !member_0;
+$\quad$do _ <- if tick then {member_0 ::= x + 1} else {ret ()}; 
+$\quad$ret x. 
+\end{coq}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Fe-Si's semantics}
+
+  \fesi{} programs:
+  \begin{itemize}
+  \item update a set of \alert{memory elements} $\Phi$;
+    \\
+    \parenthesis{registers, register files, inputs, \dots}
+  \item are based on \alert{guarded atomic actions} 
+    \\
+    \begin{center}
+    \coqe{do n <- !x + 1; (y ::= 1; assert (n = 0)) orElse (y ::= 2)}      
+    \end{center}
+  \item are endowed with a (simple) \alert{synchronous semantics}
+    \\
+    \begin{center}
+    \coqe{do n <- !x; x ::= n + 1; do m <- !x; assert (n = m)}
+    \end{center}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{\fesi{}, formally}
+  \begin{columns}
+\column{0.05\linewidth}
+
+\column{0.7 \linewidth}
+\begin{coq}
+Variable var: ty -> Type. 
+Inductive expr: ty -> Type := ...
+
+Inductive action: ty -> Type:=
+| Return: forall t, expr t -> action t
+| Bind: forall t u,  action  t -> (var t -> action u) -> action u
+(** control-flow **)
+| OrElse: forall t, action t -> action t -> action t
+| Assert: expr B -> action unit    
+(** memory operations on registers **)
+| Read: forall t, (Reg t) $\in \Phi$ -> action t
+| Writ: forall t, (Reg t) $\in \Phi$ -> expr t -> action unit
+| ... 
+\end{coq}
+    \end{columns}
+\begin{itemize}
+\item Expressions are side-effects free. 
+\item \vspace{-.5em}
+  \begin{coq}
+Definition Eval $\Phi$ t (a: forall V, action V t): $\denote\Phi$ -> option ($\denote{\tt t}$ * $\denote\Phi$).
+\end{coq}
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{RTL abreviated}
+  
+  An RTL circuit is abstracted as:
+  \begin{itemize}
+  \item a set of memory elements $\Phi$;
+  \item a combinational next-state function.
+  \end{itemize}
+  
+  \begin{center}
+    \includegraphics[width=5cm]{figs/rtl.pdf}  
+  \end{center}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{A glimpse of the first pass}
+  
+  \begin{itemize}
+  \item Transform control-flow into data-flow.
+  \end{itemize}
+
+  \only<1>{
+  \begin{center}
+    \includegraphics[width=5cm]{figs/compil-0.pdf}  
+  \end{center}
+}
+
+\only<2-3>{
+  \begin{itemize}
+  \item Compiling \coqe{e orElse f}
+  \end{itemize}
+  \begin{center}
+    \includegraphics[width=7cm]{figs/compil-1.pdf}  
+  \end{center}
+}
+
+\only<3>{
+  \begin{itemize}
+  \item  The $\Phi$ blocks are trees of effects on memory elements,
+    that must be flattened.
+  \end{itemize}
+}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{What does it look like in practice?}
+
+  \begin{columns}
+\column{0.45 \linewidth}
+\begin{coq}
+Variable var: ty -> Type. 
+Inductive tele (A : Type): Type :=
+| tend : A -> tele A
+| tbind : forall arg, expr arg -> 
+  (var arg -> tele A) -> tele A.   
+ 
+Fixpoint compose {A B}
+                 (tA : tele  A)
+                 (f : A -> tele  B) : tele  B :=
+match tA with
+  | tend e => f e
+  | tbind body cont => 
+    tbind  body (fun x => compose (cont x) f)
+end.
+\end{coq}
+
+\column{0.5\linewidth}
+\begin{coq}
+fix compile {t} (a: action $\alert{\tt var}$ ...) : tele ... := 
+match a with 
+  | Return _ exp =>  
+      x <- ... exp; 
+      & (x, #b true, nil)
+  | Bind _ _ e f => 
+      compose (compile e) (fun (ve, be, $\Phi_{\tt e}$) =>
+      compile (f ve) (fun (vf, bf, $\Phi_{\tt f}$) =>
+      & (vf, andb be bf, [...])))             
+  | OrElse _ e f => 
+      compose (compile e) (fun (ve, be, $\Phi_{\tt e}$) =>
+      compose (compile f) (fun (vf, bf, $\Phi_{\tt f}$) =>
+      r <- ... (vf ? ve : vf);
+      & (r , (orb be bf) , [...])))
+  \end{coq}
+  \end{columns}
+\parenthesis{This is just moving binders around}
+\end{frame}
+
+
+\begin{frame}[fragile]
+  \frametitle{Program transformations}
+  We implement two flavors of common sub-expression elimination. 
+  \parenthesis{here, we focus on boolean expressions}
+  \begin{itemize}
+  \item Incrementally build a BDD that abstracts the runtime values of variables.
+  \item That is, we \alert{tag} program variables with their abstraction.
+\begin{coq}
+Variable Var : type -> Type.
+Definition sval := option BDD.expr.
+Notation V := (fun t => Var t * sval).
+\end{coq}
+\item Then, the main compilation function has type
+\begin{coq}
+Fixpoint cse {A} (Gamma: Env) (T : tele V A) : tele Var A := ...
+\end{coq}
+\pause
+\item In short (plenty of details omitted):
+  \begin{itemize}
+  \item For each (boolean) expression, build a (syntactic) boolean formula;
+  \item Add this formula to the global BDD pool;
+  \item Test whether an equivalent formula was already bound
+    \begin{itemize}
+    \item if it is the case, reuse the old binder
+    \item if it is not the case, build a fresh binder
+    \end{itemize}
+  \end{itemize}
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Proving program transformations correct}
+  \begin{itemize}
+  \item Implementing transformations in PHOAS is smooth;
+  \item But proving them correct, we need a well-formedness property
+    on term.
+
+  \item Coming back on STLC:
+
+    \begin{mathpar}
+      \inferrule{ }{x,\tau_1,\tau_2 \in \Gamma \vdash Var \tau_1 \equiv Var \tau_2}
+      \and
+      \inferrule{\Gamma \vdash e_1 \equiv e'_1 \and \Gamma \vdash e_1 \equiv e'_1}
+      {\Gamma \vdash App e_1 e_2 \equiv App e'_1 e'_2}
+      \\
+      \inferrule{\forall x \tau_1 \tau_2, (x,\tau_1,\tau_2), 
+        \Gamma \vdash e_1 \tau_1 \equiv e'_1 \tau_2}
+      {\Gamma \vdash Abs e_1 \equiv App e'_1}
+      
+    \end{mathpar}
+\begin{coq}
+  
+\end{coq}
+  \end{itemize}
+  
+\end{frame}
+\end{document}
+
+\begin{frame}[fragile]
+\frametitle{An example of a parametric circuit family}
+\begin{center}
+  \only<1>{\includegraphics[height=2cm]{figs/adder-1.pdf}}
+  \only<2->{\includegraphics[height=4cm]{figs/adder-2.pdf}}
+\end{center}
+\begin{displaymath}
+  s =  a + b \quad  t =  a + b + 1
+\end{displaymath}
+\begin{columns}<3>
+   \column{0.1\linewidth}
+   \column{0.8\linewidth}
+   \begin{coq}
+Fixpoint add (n: nat) (a : V (Tint [2^ n])) (b : V (Tint [2^ n])) :=
+  match n with
+    | 0 => $\colorbox{green}{base case}$
+    | 1 + p => $\colorbox{green}{... add p ... add p ...}$
+  end\end{coq}
+\end{columns}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Why do we need both a compiler and meta-programming?}
+  \setbeamercovered{invisible}
+  \begin{center} 
+    \begin{tikzpicture}
+      \draw (0,0) node[bubble,anchor=east] (n1) {Coq + Fe-Si}  
+      (2,0) node[bubble,anchor=center] (n2) {Fe-Si};
+      \draw[thick,->] (n1.east) -- (n2.west) node[pos=0.5](mpd){};
+      \pause   
+      
+      \node[bubble,anchor=center, below=1 of mpd] (mp) {meta-programming};
+      \draw[->] (mp) -- (mpd.center);
+      \pause
+      \draw (4,0) node[bubble,anchor=west] (n3) {RTL};
+      \draw[thick,->] (n2.east) -- (n3.west) node[pos=0.5](cd){};
+\pause
+      \node[bubble,anchor=center, below=1 of cd] (c) {compiler};
+      \draw[->] (c) -- (cd.center);
+\pause
+\node[draw=dkred, thick, dashed,inner sep=10pt,outer sep=2pt,fit=(n1)
+(n2) (n3) (c) (mp)] (bb) {};
+\node[anchor=south east,inner sep=1pt] at (bb.north east) 
+    {Coq};
+    \end{tikzpicture}
+  \end{center}
+   \only<4->{\parenthesis{Our flavor of RTL is defined in terms of combinational logic
+    and registers}}
+ \only<6>{
+\begin{center}
+
+Our Fe-Si to RTL compiler is a \alert{verified compiler}
+\end{center}
+}
+  % \begin{itemize}
+  % \item<2-> Meta-programming is used to elaborate Fe-Si programs
+  % \item<4-> That are then compiled to a variant of RTL  
+  % \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{The Fe-Si  compiler}
+  \frametitle{Interesting bits}
+  \begin{itemize}
+  \item Use dependent types pervasively (like integers of size $n$):
+    \begin{itemize}
+    \item Source and target language definitions rule out ill-typed
+      programs
+      \parenthesis{e.g., at the Fe-Si level, one cannot write out of
+        the bounds of a register file}
+    \end{itemize}
+
+    \item Implements mainly a transformation from guarded atomic actions to data-flow
+    \item With some optimizations
+      \begin{itemize}
+      \item Syntactic common sub-expression elimination 
+      \item Semantic common sub-expresssion elimination for Booleans
+        \parenthesis{incl. a verified BDD package in Coq}
+      \end{itemize}
+ 
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Coming back to circuit verification}
+ \setbeamercovered{invisible}
+  \begin{center}
+    \begin{tikzpicture}
+      \node[bubble] (src){Coq + Fe-Si};
+      \pause
+      \node[bubble,left=1cm of src] (src-correct) {Interactive proof};
+      \draw[thick,->] (src-correct) -- (src);
+      \pause
+      \node[bubble, below=1cm of src](rtl) {RTL program};
+      \draw[thick,->] (src) -- (rtl) node[pos=0.5](src-rtl){};
+
+      \pause
+
+      \draw[thick,dashed,double] (src.east) to[bend left] (rtl.east);
+   
+      \pause
+
+      \node[bubble,left=1cm of rtl] (rtl-correct) {Correct by construction};
+      \draw[thick,->] (rtl) -- (rtl-correct);
+     
+    \end{tikzpicture}
+ \end{center}
+\medskip
+
+\begin{itemize}
+\item Our verification effort happens at the level of \alert{circuit
+      generators}
+   
+  \item  It composes with the compiler proof (done \alert{once and for all})
+  \end{itemize}
+\end{frame}
+
+
+\begin{frame}
+  \frametitle{A bitonic sorter core}
+  \begin{center}
+    \begin{itemize}
+    \item Parameters: width, type equipped with a compare-and-swap operation
+
+    \end{itemize}
+    \includegraphics[width=\textwidth]{figs/bitonic1.png}
+    \begin{itemize}
+    \item Bitonic: $x_0 \le \dots \le x_k \ge \dots \ge x_{n-1}$ for
+      some $k$, or a circular shift.
+    \item Red: bitonic $\to$ $l_1$ bitonic, $l_2$ bitonic (and $l_1
+      \le l_2$)
+    \item Blue (resp. green): bitonic $\to$ sorted (resp. sorted in
+      reverse order)
+    \end{itemize}
+  \end{center}
+\end{frame}
+
+\begin{frame} 
+\setbeamercovered{invisible}
+
+   \frametitle{A bitonic sorter core: proof}
+   \begin{center}
+     \begin{tikzpicture}
+       \draw (0,0) node[bubble,anchor=center] (n1) {Circuit generator}
+       (4,0) node[bubble, anchor = center] (n2) {Functional Implementation};
+       \pause
+       \draw (4,-1.5) node (proof) [bubble] {Proof};
+       \draw[thick,dashed,double] (proof.north) -- (n2.south);
+       \pause 
+       \draw (6,-1.5) node (01) [bubble,anchor=center] {0-1 principle};
+       \draw[thick,dashed,double] (proof.east) -- (01.west);
+       \pause
+       \draw[thick,dashed,double] (n1.east) -- (n2.west)
+       node[pos=0.5](ad){};
+       \node[above=10pt of ad]{Adequacy};
+       \pause
+       \draw (0, -1.5) node[bubble] (rtl) {RTL};
+       \draw[thick,dashed,double] (rtl.north) -- (n1.south);
+       \draw[thick,dashed,double] (rtl.south) to[bend right]
+       (proof.south) ; 
+     \end{tikzpicture}
+   \end{center}
+\only<3>{
+  \begin{theorem}[0-1 principle]
+    To prove that a (parametric) sorting network is correct, it
+    suffices to prove that it sorts all sequences of 0 and 1.      
+  \end{theorem}
+}
+\only<5>{
+  \begin{theorem}
+    Given $n$ (a bit-width), and $m$, we generate a circuit that sorts
+    $2^m$ integers of size $n$. 
+  \end{theorem}
+}
+
+\end{frame}
+\begin{frame}[fragile]
+  \frametitle{A bitonic sorter core: verification effort}
+\newcommand{\slice}[4]{
+  \pgfmathparse{0.5*#1+0.5*#2}
+  \let\midangle\pgfmathresult
+
+  % slice
+  \draw[thick,fill=black!10] (0,0) -- (#1:1) arc (#1:#2:1) -- cycle;
+
+  % outer label
+  \node[label=\midangle:#4] at (\midangle:1) {};
+
+  % inner label
+  \pgfmathparse{min((#2-#1-10)/110*(-0.3),0)}
+  \let\temp\pgfmathresult
+  \pgfmathparse{max(\temp,-0.5) + 0.8}
+  \let\innerpos\pgfmathresult
+  \node at (\midangle:\innerpos) {#3};
+}
+
+\begin{center}
+  \begin{tikzpicture}[scale=1.5]
+    \newcounter{a} \newcounter{b} 
+    \foreach \p/\t in 
+    {57/Functional Alg. and Proof, 19/0-1 principle, 8/Circ. gen., 16/Adequacy} 
+    { \setcounter{a}{\value{b}}
+      \addtocounter{b}{\p} 
+      \slice{\thea/100*360}{\theb/100*360}{\p\%}{\t} }  
+  \end{tikzpicture}
+\end{center}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Another example: a family of stack machines}
+\begin{small}
+  \begin{columns}
+\column{0.2\linewidth}
+    \begin{tabular}{rcll}
+i & ::=   & \texttt{const $n$                     }\\
+  & $|$   & \texttt{var   $x$                              }\\
+  & $|$   & \texttt{setvar  $x$                            }\\
+  & $|$   & \texttt{add                                        }\\
+  & $|$   & \texttt{sub                                        }\\
+  & $|$   & \texttt{bfwd $\delta$             }\\
+  & $|$   & \texttt{bbwd $\delta$              }\\
+  & $|$   & \texttt{bcond $c$ $\delta$ }\\
+ \\
+  & $|$   & \texttt{halt                                       }\\
+\end{tabular}
+
+\column{0.7\linewidth}
+\begin{tabular}{ll}
+$\vdash pc,\sigma,s \to pc+1, n :: \sigma,s$& \\
+$\vdash pc,\sigma,s \to pc+1, s(x) :: \sigma,s$ & \\
+$\vdash pc,v::\sigma,s \to pc+1, \sigma,s[x \leftarrow v]$ & \\
+$\vdash pc,n_2::n_1::\sigma,s \to pc+1, (n_1+n_2)::\sigma,s$&\\
+$\vdash pc,n_2::n_1::\sigma,s \to pc+1, (n_1-n_2)::\sigma,s$&\\
+$\vdash pc,\sigma,s \to pc+1+\delta, \sigma,s$ &  \\
+$\vdash pc,\sigma,s \to pc+1-\delta, \sigma,s$ & \\
+$\vdash pc,n_2::n_1::\sigma,s \to pc+1+\delta, \sigma,s$ & \text{if $c~n_1~n_2$} \\
+$\vdash pc,n_2::n_1::\sigma,s \to pc+1, \sigma,s$ & \text{if  $\neg (c~n_1~n_2)$} \\
+\texttt{no reduction}
+\end{tabular}
+\end{columns}
+\end{small}
+
+\begin{itemize}
+\item Implementation parameterized by the size of the values, the size of the
+  stack, \dots
+\end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Some related work}
+  \begin{itemize}
+  \item Verifying hardware with theorem provers:
+    \begin{itemize}
+    \item many formalizations of hardware description languages (ACL2, HOL, PVS)
+      % ACL2 :DE2
+      % Hol : Experience with embedding hardware description languages
+      % in HOL (1992)
+      % PVS : Bluespec
+    \item many models of hardware designs (ACL2, HOL, PVS, Coq)
+      \begin{itemize}
+      \item The FM9001 chip of the CLI stack (Nqthm)
+      \item[-] Floating-point operations verified at AMD using ACL2
+      \item[-] VAMP [2003] (a pipelined micro-processor verified in
+        PVS)
+      \end{itemize}
+    \item high-level formalization of the ARM architecture in HOL
+    \item ...
+    \end{itemize}
+  \item Circuit generators in Haskell (Lava [1998]), verification using
+    automated methods. 
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Our message}
+   
+    \begin{itemize}
+    \item Bluespec started as an HDL deeply embedded in Haskell
+    \item Lava [1998] is another HDL deeply embedded in Haskell
+    \item \fesi{} is ``just'' another HDL,  deeply embedded in \alert{Coq}
+      \pause
+      \begin{itemize}
+      \item semantics (i.e., interpreter), compiler and programs are \alert{integrated seamlessly}
+      \item use Coq's rich type system to capture interesting properties (e.g., sizes)
+      \end{itemize}
+    \end{itemize}
+
+    \pause
+
+    \begin{center}
+      Coq is a tool of choice to make a deep embedding of a \alert{DSL}
+    \end{center}
+\end{frame}
+
+
+\begin{frame}
+  \frametitle{Thank you for your attention}
+  
+  \begin{center}
+ %   \includegraphics[height= 2cm ]{figs/compilation.pdf}
+
+    \vspace{1cm}
+
+    If you have any questions ... \\
+  \end{center}
+  
+\end{frame}
+\end{document}
+
+
+\begin{frame}
+  \frametitle{Context: formal verification of hardware}
+  
+  \begin{itemize}
+  % \item  Formally verified everything:
+  %   \begin{itemize}
+  %   \item Compilers (CompCert [2006])
+  %   \item Operating Systems (Gypsy [1989]; seL4 [2009])
+  %   \item Static analysers
+  %   \item \alert<2->{Hardware}
+  %   \end{itemize}
+  
+  % \pause
+
+  \item Verifying hardware with theorem provers:
+    \begin{itemize}
+    \item many \emph{shallow-embeddings} of hardware description languages (ACL2 , HOL, PVS)
+      % ACL2 :DE2
+      % Hol : Experience with embedding hardware description languages in HOL (1992)
+      % PVS : Bluespec
+    \item many \emph{shallow-embeddings} of hardware designs (ACL2, HOL, PVS, Coq) 
+      \begin{itemize}
+      \item[-] Floating-point operations verified at AMD using ACL2 
+      \item[-] VAMP [2003]  (a pipelined micro-processor verified in PVS)
+      \end{itemize}
+    \item high-level formalization of the ARM architecture in HOL
+    \item ...
+    \end{itemize}
+
+    \pause
+    
+    % This verification does not match what is really done
+  \item Industry shifts toward \alert{hardware synthesis}: 
+    \begin{itemize}
+    \item generates low-level code (RTL) from high-level HDLs
+    \item argue (in)formally that this synthesis is correct
+    \end{itemize}
+    \parenthesis{Bluespec, Esterel, Lustre, \dots}
+  \end{itemize}
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+\begin{frame}
+  \frametitle{This project}
+  \framesubtitle{on-going work}
+  \begin{itemize}
+  \item  Investigate hardware synthesis in Coq
+    
+    \begin{center}
+      \includegraphics[height= 2cm ]{figs/compilation.pdf}
+    \end{center}
+    \pause
+    
+  \item Source language: \alert{\fesi{}} (Featherweight Synthesis)
+    \begin{itemize}
+    \item Stripped down and simplified version of \alert{Bluespec} 
+    \item Semantics based on ``guarded atomic actions'' (with a flavour of transactional memory)
+    \end{itemize}
+    
+    \pause
+    
+  \item Target language: RTL
+    \begin{itemize}
+    \item Combinational logic and next-state assignments for registers
+    \item No currents, no delays, single-clock
+    \end{itemize}
+    
+    \pause
+    
+  \item We define \emph{deep-embeddings}
+    \begin{itemize}
+    \item Define data-structures to represent programs
+    \item Define what is a program's semantics (via an interpretation function) 
+    \end{itemize}
+  \item Use \alert{parametric higher-order abstract syntax} (PHOAS) to deal with binders
+  \end{itemize}
+\end{frame}
+
+
+\defverbatim[colored]\phoasprimer{
+}
+ \begin{frame}[fragile]
+  \frametitle{A PHOAS primer}
+  \begin{itemize}
+  \item Use Coq bindings to represent the bindings of the object language.
+    \newcommand\arrow{\ulcorner \to \urcorner}
+\begin{coq}
+Section t. 
+  Variable var: T -> Type.
+  
+  Inductive term : T -> Type :=
+  | Var: forall t, var t -> term t
+  | Abs: forall $\alpha$ $\beta$, (var $\alpha$ -> term $\beta$) -> term ($\alpha$ $\arrow$ $\beta$)
+  | App: ...
+End t. 
+
+Definition Term := forall (var: T -> Type), term var. 
+
+Example K $\alpha$ $\beta$ : Term ($\alpha~\arrow{}~\beta{}~\arrow{}~\alpha$):= fun V =>
+$\quad$Abs (fun x => Abs (fun y => Var x)).
+\end{coq}
+
+\pause
+
+\item An \alert{intrinsic approach} (strongly typed syntax vs. syntax + typing judgement)
+\item Program transformations are easier to implement (and prove!) 
+  \parenthesis{with one caveat}
+\end{itemize}
+\end{frame}
+% \begin{frame}[fragile]
+%   \frametitle{A PHOAS primer}
+%   \framesubtitle{Face-off with Dependent de Bruijn indices}
+%   \begin{columns}
+%     \column{0.07 \linewidth}
+%     \column{0.5 \linewidth}
+% \newcommand\env{\Gamma}
+% \begin{coq}
+% Inductive var : list T -> T -> Type :=
+% | 0 : forall $\env$ t , var (t::$\env$) t
+% | S : forall $\env$ t u , var $\env$ u -> var (t::$\env$) u. 
+
+% Inductive term : list T -> T -> Type :=
+% | Var: forall $\env$ t, var $\env$ t -> term $\env$ t
+% | Abs: forall $\env$ $\alpha$ $\beta$, term ($\alpha$:: $\env$) $\beta$ -> 
+%            term $\env$ ($\alpha$ $\ulcorner \to \urcorner$ $\beta$)
+% | App: ...  
+
+% Example K := 
+% $\quad$Abs (Abs (Var (S 0))).
+% \end{coq}
+%     \column{0.5 \linewidth}
+% \only<2->{\phoasprimer}
+%   \end{columns}
+%   \begin{itemize}
+%   \item<3> Two alternative  \alert{intrinsic approaches}
+%     \begin{itemize}
+%     \item strongly typed syntax
+%     \item alternative to syntax + typing judgement
+%     \end{itemize}
+%   \end{itemize}
+% \end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+
+\begin{frame}
+  \frametitle{Outline}       
+  \tableofcontents  
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+
+\section{A glimpse of the languages and the compiler}
+\begin{frame}[fragile]
+  \frametitle{\fesi{} in a nutshell}
+
+  \fesi{} programs:
+  \begin{itemize}
+  \item update a set of \alert{memory elements} $\Phi$;
+    \\
+    \parenthesis{registers, register files, fifos, \dots}
+  \item are based on \alert{guarded atomic actions} 
+    \\
+    \begin{center}
+    \coqe{do n <- !x + 1; (y := 1; assert (n = 0)) orElse (y := 2)}      
+    \end{center}
+  \item are endowed with a (simple) \alert{synchronous semantics}
+    \\
+    \begin{center}
+    \coqe{do n <- !x; x := n + 1; do m <- !x; assert (n = m)}
+    \end{center}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{\fesi{} in a nutshell}
+  \begin{columns}
+\column{0.1\linewidth}
+
+\column{0.6 \linewidth}
+\begin{coq}
+Variable V: T -> Type. 
+Inductive $\mathbb A$: T -> Type:=
+| Return: forall t, expr t -> $\mathbb A$ t
+| Bind: forall t u,  $\mathbb A$  t -> (V t -> $\mathbb A$ u) -> $\mathbb A$ u
+
+(** effects **)
+| Primitive: ... 
+
+(** control-flow **)
+| OrElse: forall t, $\mathbb A$ t -> $\mathbb A$ t -> $\mathbb A$ t.
+| Assert: expr Tbool -> $\mathbb A$ Tunit\end{coq}
+    \end{columns}
+
+
+\begin{itemize}
+\item Expressions are side-effects free. 
+\item Primitives are operations on memory elements (dependent on $\Phi$)
+\item 
+  \begin{coq}
+Definition Eval $\Phi$ t (a: forall V, $\mathbb A$ V t): $\denote\Phi$ -> option ($\denote{\tt t}$ * $\denote\Phi$).
+\end{coq}
+\end{itemize}
+
+\end{frame}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+\begin{frame}[fragile]
+  \frametitle{RTL in a nutshell}
+  \begin{columns}
+    \column{0.5 \textwidth}
+\includegraphics[width=5cm]{figs/rtl.pdf}
+    
+    \column{0.5 \textwidth}
+    \begin{coq}
+Variable V: T -> Type.       
+
+Inductive $\mathbb T$ (A: Type): Type:=
+| Bind: forall arg, expr arg -> (V arg -> $\mathbb T$ A) -> $\mathbb T$ A
+| End: A -> $\mathbb T$ A.
+
+Inductive $\mathbb E$: memory -> Type:=
+| write: forall t,  V t -> V Tbool -> $\mathbb E$ (R t)
+| ...
+
+Definition block t:=
+  $\mathbb T$ (V Tbool  * V t  * DList.T (option $\circ$ $\mathbb E$) $\Phi$). 
+\end{coq}
+  \end{columns}
+
+
+\begin{itemize}
+\item Simple synchronous semantics 
+  \begin{coq}
+Definition Eval $\Phi$ t (a: forall V, block V t): $\denote\Phi$ -> option ($\denote{\tt t}$ * $\denote\Phi$).
+\end{coq}
+\end{itemize} 
+\end{frame}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+
+\defverbatim[colored]\firstpass{
+\begin{ocaml}
+x0 <-  ! r1;
+x1 <- x0 <> 0;
+x2 <-  !r2;
+x3 <- x0 - 1;
+x4 <- x2 + 1;
+x5 <-  !r2;
+x6 <- x6;
+begin 
+  if x1 then (r1 := x3; r2 := x4);
+  if  !x1 then (r1 := x6)
+end
+\end{ocaml}} 
+
+\defverbatim[colored]\secondpass{
+\begin{ocaml}
+x0   <-  ! r1;
+x1   <- x0 <> 0;
+x2   <-  ! r2;
+x3   <- x0 - 1;
+x4   <- x2 + 1;
+x5   <-  ! r2;
+x6   <- x5;
+x8   <- x1;
+x9   <- x1;
+x10 <- not x1;
+x11 <- x8 || x10;
+x12 <- x8 ?  x3 : x6;
+begin 
+  r1 := x12 when x11;
+  r2 := x4 when x9
+end
+\end{ocaml}} 
+
+\defverbatim[colored]\thirdpass{
+\begin{ocaml}
+x0   <- !r1 
+x1   <- 0;
+x2   <- x0 = x1;
+x3   <- not x2;
+x4   <- !r2;
+x5   <- 1;
+x6   <- x0 - x5;
+x7   <- x4 + x5;
+x8   <- !r2;
+x9   <- not x3;
+x10 <- x3 || x9
+x11 <-x3 ? x6 : x8
+begin
+  r1 := x11 when x10;
+  r2 := x8 when x3
+end
+\end{ocaml}}
+
+\defverbatim[colored]\finalpass{
+\begin{ocaml}
+x0   <- !r1 
+x1   <- 0;
+x2   <- x0 = x1;
+x3   <- not x2;
+x4   <- !r2;
+x5   <- 1;
+x6   <- x0 - x5;
+x7   <- x4 + x5;
+x8   <-x3 ? x6 : x4
+begin
+  r1 := x8 when true;
+  r2 := x4 when x3
+end
+\end{ocaml}}
+
+\begin{frame}[fragile]
+  \frametitle{Compiling \fesi{} to RTL}
+  
+Running example:
+\begin{coq}
+do x <- ! r1;if (x <> 0) then {do y <- !r2; r1 := x - 1; r2 := y + 1} else { y <- !r2; r1 := y}
+\end{coq}
+ 
+\pause
+\begin{columns}
+\column{0.1 \textwidth}  
+\column{0.5 \textwidth}  
+\begin{enumerate}
+\item<+-> Pull out all bindings (that is, ANF)
+\item<+-> Push down the nested conditions
+\item<+-> Perform CSE (in 3-address code)
+\item<+-> WIP: Boolean simplification
+\end{enumerate}
+\column{0.5 \textwidth}  
+\only<2>{\firstpass}
+\only<3>{\secondpass}
+\only<4>{\thirdpass}
+\only<5>{\finalpass}
+\end{columns}
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+\begin{frame}[fragile]
+  \frametitle{PHOAS in action}
+
+  \begin{itemize}
+  \item<+-> (Temporary) final result
+\begin{coq}
+Definition Compile $\Phi$ t  (a : forall V, $\mathbb A$ $\Phi$ V t) : forall V, block V $\Phi$ t :=
+  let x := Flat.Compile $\Phi$ t (Push.Compile $\Phi$  t (Pull.Compile $\Phi$  t a)) in
+  CSE.Compile $\Phi$ t x.
+\end{coq}
+
+\begin{coq}
+Theorem Compile_correct $\Phi$ t a :
+  let x := Flat.Compile $\Phi$ t (Push.Compile $\Phi$  t (Pull.Compile $\Phi$  t a)) in
+  WF $\Phi$ t x -> forall (st : $\denote\Phi$),  Eval $\Phi$ t (CSE.Compile $\Phi$ t x) st = Eval $\Phi$ t a st. 
+\end{coq}
+
+\item<+-> No need to prove lemmas about substitutions!
+\item<+-> What about \coqe{WF $\Phi$ t x} ? 
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Well-formedness}
+
+  \begin{itemize}
+  \item   \coqe{WF $\Phi$ t x} states that \coqe{x} is  parametric w.r.t. the instantiation of \coqe{V}. 
+  \item  We may:
+    \begin{itemize}
+    \item posit \coqe{forall x, WF $\Phi$ t x} as an axiom (informed
+      parties think that this is consistent with Coq)
+    \item or define what is \coqe{WF} for each language, prove that compilation preserves \coqe{WF} and prove that each starting program is \coqe{WF} 
+    \item or generates \coqe{WF $\Phi$ t x} as a \alert{proof-obligation}, and discharge it using tactics
+    \end{itemize}
+  \end{itemize}
+\end{frame}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+\section{Examples}
+
+\begin{frame}
+  \frametitle{Outline}       
+  \tableofcontents [currentsection] 
+\end{frame}
+
+
+\begin{frame}[fragile]
+\frametitle{Recursive circuits: A divide and conquer adder (without pain)}
+\framesubtitle{Meta-programming for free}
+\begin{columns}
+  \column{0.5\linewidth}
+  \begin{center}
+    \includegraphics[height= 3cm ]{figs/DC1.pdf}
+  \end{center}
+  \column{0.5\linewidth}
+  \begin{center}
+    \includegraphics[height= 3cm ]{figs/DC.pdf}
+  \end{center}
+\end{columns}
+\begin{columns}
+\column{0.1\linewidth}
+\column{0.5\linewidth}
+\begin{scoq}
+Variable V : T -> Type. 
+
+Fixpoint add $\Phi$ n (x : V (Tint [2^ n])) (y : V (Tint [2^ n])) := 
+match n  with 
+| 0 => Return ( (x = 1) || (y = 1) ;
+          (x = 1) && (y = 1); x + y; x + y + 1)
+
+
+
+
+$$
+\end{scoq}
+\column{0.5\linewidth}
+\begin{scoq}
+| S n => 
+  DO (xL,xH) <- (low x, high x);
+  DO (yL,yH) <- (low y, high y);
+  DO (pL, gL, sL, tL) <- add n xL yL; 
+  DO (pH, gH, sH, tH) <- add n xH yH; 
+  DO sH' <- (gL ? tH : sH);
+  DO tH' <- (pL ? tH : sH);
+  DO pH' <- (gH || (pH && gH));
+  DO gH' <- (gH || (pH && gL));
+  Return (pH'; gH'; sL $\otimes$ sH' ; tL $\otimes$ tH' )
+end.  
+\end{scoq}
+\end{columns}
+\parenthesis{builds a 4-uple: carry-propagate, carry-generate, sum w/ carry, sum w/o carry}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Processor designs}
+  \begin{itemize}
+  \item Easy translation from old Bluespec papers
+    \begin{columns}
+\column{0.1 \linewidth}
+\column{0.3\linewidth}
+      \begin{coq}
+Definition bz :=
+DO pc <- ! PC 
+DO I   <- IMEM.[pc] ; 
+WHEN (opcode I =  3 );
+DO r1 <- RF.[r1 I];
+DO r2 <- RF.[r2 I];
+If  r1 = 0 { PC := r2 }
+Else {PC := pc + 1}
+\end{coq}
+
+
+\column{0.5\linewidth}
+\begin{coq}
+(** Rule BZ taken **)
+Proc(PC,RF,IMEM,DMEM) 
+if (RF[r1] = 0) where BZ(r1,r2) = IMEM[PC]
+-> Proc(RF[r2],RF,IMEM,DMEM)
+
+(** Rule BZ not taken **)
+Proc(PC,RF,IMEM,DMEM) 
+if (RF[r1] <> 0) where BZ(r1,r2) = IMEM[PC]
+-> Proc(PC + 1,RF,IMEM,DMEM)
+\end{coq}
+\end{columns}
+
+\item \coqe{Definition isa := loadi $\oplus$ loadpc $\oplus$  add $\oplus$ bz $\oplus$ load $\oplus$ store}
+% \item Use a mixture of notations and intermediate definitions
+\end{itemize}
+\parenthesis{Not yet tried to prove anything about this one}
+\end{frame}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+\begin{frame}[fragile]
+  \frametitle{PHOAS in action (2)}
+
+  \begin{itemize}
+  \item<1-> PHOAS shines when defining examples of circuits inside Coq: 
+    \begin{itemize}
+    \item makes it possible to use fancy coq notations 
+\begin{coq}
+Notation "'DO' X <- A ; B" := (Bind A (fun X => B)) ( ... )      
+\end{coq}
+\item other solutions (e.g., dependently typed de Bruijn indices) would not scale
+\item keep all the benefits of deep-embeddings!
+\end{itemize}
+\end{itemize}
+\end{frame}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+
+
+\section{Conclusion}
+% Rant about Coq
+\begin{frame}
+  \frametitle{Outline}       
+  \tableofcontents [currentsection] 
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Some remarks}
+  \begin{itemize}
+
+  \item Stepping back
+    \begin{itemize}
+    \item Bluespec started as an HDL deeply embedded in Haskell
+    \item Lava [1998] is another HDL deeply embedded in Haskell
+    \item \fesi{} is ``just'' another HDL,  deeply embedded in \alert{Coq}
+      \pause
+      \begin{itemize}
+      \item semantics (i.e., interpreter), compiler and programs are \alert{integrated seamlessly}
+      \item use of computation \alert{inside} Coq to dump compiled programs
+      \item dependent types capture some interesting properties in hardware
+      \end{itemize}
+    \end{itemize}
+
+\pause
+
+  \item Future work
+      \begin{itemize}
+      \item Improve on the language (inputs, FIFOs, schedulers)
+      \item Better compiler (boolean optimisations/BDDs)
+      \item Extraction/plugin to output actual VHDL/Verilog
+      \item Prove some designs correct  
+      \end{itemize}
+      
+\pause
+
+    \item Closing remarks (wish-list)
+      \begin{itemize}
+      \item Generated induction principles useless
+      \item Mutual fixpoints and inner fixpoints being not equivalent
+      \item Could really use some help from SMT solvers to solve bitvector arithmetic goals
+      \end{itemize}
+  
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Thank you for your attention}
+  
+  \begin{center}
+    \includegraphics[height= 2cm ]{figs/compilation.pdf}
+
+    \vspace{1cm}
+
+    If you have any questions ... \\
+  \end{center}
+  
+\end{frame}
+\end{document}
