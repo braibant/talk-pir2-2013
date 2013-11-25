@@ -773,7 +773,13 @@ Fixpoint cse {A} (Gamma: Env) (T : tele V A) : tele Var A := ...
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Proving program transformations correct}
+\begin{frame}[fragile]
+  \frametitle{Proving program transformations correct}
+
+\newcommand\lvar[1]{{\tt Var~#1}}
+\newcommand\labs[1]{{\tt Abs~#1}}
+\newcommand\lapp[2]{{\tt App~#1~#2}}
+
   \begin{itemize}
   \item Implementing transformations in PHOAS is smooth;
   \item But proving them correct, we need a well-formedness property
@@ -782,19 +788,54 @@ Fixpoint cse {A} (Gamma: Env) (T : tele V A) : tele Var A := ...
   \item Coming back on STLC:
 
     \begin{mathpar}
-      \inferrule{ }{x,\tau_1,\tau_2 \in \Gamma \vdash Var \tau_1 \equiv Var \tau_2}
+      \inferrule{ }{(x,\tau_1,\tau_2) \in \Gamma \vdash \lvar{\tau_1} \equiv \lvar{\tau_2}}
       \and
       \inferrule{\Gamma \vdash e_1 \equiv e'_1 \and \Gamma \vdash e_1 \equiv e'_1}
-      {\Gamma \vdash App e_1 e_2 \equiv App e'_1 e'_2}
+      {\Gamma \vdash \lapp{e_1}{e_2} \equiv \lapp{e'_1}{e'_2}}
       \\
-      \inferrule{\forall x \tau_1 \tau_2, (x,\tau_1,\tau_2), 
-        \Gamma \vdash e_1 \tau_1 \equiv e'_1 \tau_2}
-      {\Gamma \vdash Abs e_1 \equiv App e'_1}
-      
+      \inferrule{(x,\tau_1,\tau_2) ::   \Gamma \vdash e_1~\tau_1 \equiv e_2~\tau_2}
+      {\Gamma \vdash \labs{e_1} \equiv \labs{e_2}}
     \end{mathpar}
+
+  \item In Coq,  
 \begin{coq}
-  
+Variables var1 var2: T -> Type.
+Definition $\Gamma$ := list ({t: T & (var1 t * var2 t)}). 
+Inductive ($\vdash$) : $\Gamma$ -> term var1 t -> term var2 t -> Prop := ...
 \end{coq}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Proving program transformations correct}
+  The proof of correctness of (most) of our transformations  applies only to well-formed terms.
+
+  Problem:
+  \begin{itemize}
+  \item For each program, it is easy to prove it WF (using tactics).
+  \item But, we cannot prove that all programs are WF (meta-theoritical result)
+  \end{itemize}
+
+  Solutions:
+  \begin{itemize}
+  \item Either assume this parametricity property as an axiom;
+  \item or prove that all source programs are WF (and that transformations preserve WF);
+  \item or generate proof obligations for all intermetiate programs (and discharge them using tactics).
+  \end{itemize}
+
+\end{frame}
+
+\plan{Wrapping-up}{
+
+  \begin{itemize}
+  \item Using PHOAS, it is easy to formalize EDSL in Coq. 
+  \item In this project, we use Coq's extraction to generate VHDL code from our back-end
+  \item Proof of (intricate) circuit generators is (relatively) smooth.
+  \end{itemize}
+}
+
+\end{document}
+    \end{mathpar}
   \end{itemize}
   
 \end{frame}
