@@ -225,6 +225,9 @@ sep=4pt, inner ysep=4pt, solid]
   \begin{example}
     \begin{center}
       \includegraphics[height=3cm]{figs/register.pdf}
+
+    \texttt{Mem} : \alert{ \tt circuit 2 1} 
+
     \end{center}
   \end{example}}
 \end{frame}
@@ -268,7 +271,7 @@ sep=4pt, inner ysep=4pt, solid]
 \begin{frame}[fragile]
   \frametitle{A better dependent type for circuits in Coq}
   \begin{itemize}
-  \item Let'suse arbitrary types as \alert{indexes} for the ports:
+  \item Let's use arbitrary types as \alert{indexes} for the ports:
   \begin{coq}
 Inductive $\circuit{}{}$ : Type -> Type -> Type := ...      
 \end{coq}
@@ -397,11 +400,13 @@ Inductive sem: forall (n m: Type) (c: $\circuit{\tt n}{\tt m}$) -> (n -> $\data$
     \end{mathpar}  
     \pause
   \item Use it to define specifications.
+  \item Bad: {\em ``This circuit implements $foo: (\unit \oplus \unit \to \bool) \to (\bool \to \bool)$''}
+  \item Better: {\em ``This circuit implements $foo: \bool \otimes \bool \to \bool \otimes \bool$''}
   \end{itemize}
 \end{frame}
 
 \begin{frame}
-  \frametitle{An adder}
+  \frametitle{A circuit generator: an adder}
 
   \begin{center}
     \only<1>{\includegraphics[height=2cm]{figs/adder-1.pdf}}
@@ -726,17 +731,17 @@ end.
 fix compile {t} (a: action $\alert{\tt var}$ ...) : tele ... := 
 match a with 
   | Return _ exp =>  
-      x <- ... exp; 
-      & (x, #b true, nil)
+      tbind (... exp) (fun x => 
+      tend (x, #b true, nil))
   | Bind _ _ e f => 
       compose (compile e) (fun (ve, be, $\Phi_{\tt e}$) =>
       compile (f ve) (fun (vf, bf, $\Phi_{\tt f}$) =>
-      & (vf, andb be bf, [...])))             
+      tend (vf, andb be bf, [...])))             
   | OrElse _ e f => 
       compose (compile e) (fun (ve, be, $\Phi_{\tt e}$) =>
       compose (compile f) (fun (vf, bf, $\Phi_{\tt f}$) =>
-      r <- ... (vf ? ve : vf);
-      & (r , (orb be bf) , [...])))
+      tbind (... (be ? ve : vf)) (fun r => 
+      tend (r , (orb be bf) , [...]))))
   \end{coq}
   \end{columns}
 \parenthesis{This is just moving binders around}
@@ -797,6 +802,7 @@ Fixpoint cse {A} (Gamma: Env) (T : tele V A) : tele Var A := ...
       {\Gamma \vdash \labs{e_1} \equiv \labs{e_2}}
     \end{mathpar}
 
+    \parenthesis{Forall term $t$, and variable representations $\nu_1,\nu_2$, $t \nu_1 = t \nu_2$ }
   \item In Coq,  
 \begin{coq}
 Variables var1 var2: T -> Type.
@@ -810,17 +816,17 @@ Inductive ($\vdash$) : $\Gamma$ -> term var1 t -> term var2 t -> Prop := ...
   \frametitle{Proving program transformations correct}
   The proof of correctness of (most) of our transformations  applies only to well-formed terms.
 
-  Problem:
+  \alert{Problem}:
   \begin{itemize}
   \item For each program, it is easy to prove it WF (using tactics).
   \item But, we cannot prove that all programs are WF (meta-theoritical result)
   \end{itemize}
 
-  Solutions:
+  \alert{Solutions}:
   \begin{itemize}
   \item Either assume this parametricity property as an axiom;
   \item or prove that all source programs are WF (and that transformations preserve WF);
-  \item or generate proof obligations for all intermetiate programs (and discharge them using tactics).
+  \item or generate proof obligations for all intermediate programs (and discharge them using tactics).
   \end{itemize}
 
 \end{frame}
@@ -828,17 +834,480 @@ Inductive ($\vdash$) : $\Gamma$ -> term var1 t -> term var2 t -> Prop := ...
 \plan{Wrapping-up}{
 
   \begin{itemize}
-  \item Using PHOAS, it is easy to formalize EDSL in Coq. 
-  \item In this project, we use Coq's extraction to generate VHDL code from our back-end
+  \item Using PHOAS, it is easy to formalize EDSLs in Coq. 
+  \item In this project, we use Coq's extraction to generate Verilog code from our back-end
   \item Proof of (intricate) circuit generators is (relatively) smooth.
   \end{itemize}
 }
 
-\end{document}
-    \end{mathpar}
+\begin{frame}
+  \frametitle{Coming back to circuit verification}
+ \setbeamercovered{invisible}
+  \begin{center}
+    \begin{tikzpicture}
+      \node[bubble] (src){Coq + Fe-Si};
+      \pause
+      \node[bubble,left=1cm of src] (src-correct) {Interactive proof};
+      \draw[thick,->] (src-correct) -- (src);
+      \pause
+      \node[bubble, below=1cm of src](rtl) {RTL program};
+      \draw[thick,->] (src) -- (rtl) node[pos=0.5](src-rtl){};
+
+      \pause
+
+      \draw[thick,dashed,double] (src.east) to[bend left] (rtl.east);
+   
+      \pause
+
+      \node[bubble,left=1cm of rtl] (rtl-correct) {Correct by construction};
+      \draw[thick,->] (rtl) -- (rtl-correct);
+     
+    \end{tikzpicture}
+ \end{center}
+\medskip
+
+\begin{itemize}
+\item Our verification effort happens at the level of \alert{circuit
+      generators}
+   
+  \item  It composes with the compiler proof (done \alert{once and for all})
+  \end{itemize}
+\end{frame}
+
+
+\begin{frame}
+  \frametitle{A bitonic sorter core}
+  \begin{center}
+    \begin{itemize}
+    \item Parameters: width, type equipped with a compare-and-swap operation
+
+    \end{itemize}
+    \includegraphics[width=\textwidth]{figs/bitonic1.png}
+    \begin{itemize}
+    \item Bitonic: $x_0 \le \dots \le x_k \ge \dots \ge x_{n-1}$ for
+      some $k$, or a circular shift.
+    \item Red: bitonic $\to$ $l_1$ bitonic, $l_2$ bitonic (and $l_1
+      \le l_2$)
+    \item Blue (resp. green): bitonic $\to$ sorted (resp. sorted in
+      reverse order)
+    \end{itemize}
+  \end{center}
+\end{frame}
+
+\begin{frame} 
+\setbeamercovered{invisible}
+
+   \frametitle{A bitonic sorter core: proof}
+   \begin{center}
+     \begin{tikzpicture}
+       \draw (0,0) node[bubble,anchor=center] (n1) {Circuit generator}
+       (4,0) node[bubble, anchor = center] (n2) {Functional Implementation};
+       \pause
+       \draw (4,-1.5) node (proof) [bubble] {Proof};
+       \draw[thick,dashed,double] (proof.north) -- (n2.south);
+       \pause 
+       \draw (6,-1.5) node (01) [bubble,anchor=center] {0-1 principle};
+       \draw[thick,dashed,double] (proof.east) -- (01.west);
+       \pause
+       \draw[thick,dashed,double] (n1.east) -- (n2.west)
+       node[pos=0.5](ad){};
+       \node[above=10pt of ad]{Adequacy};
+       \pause
+       \draw (0, -1.5) node[bubble] (rtl) {RTL};
+       \draw[thick,dashed,double] (rtl.north) -- (n1.south);
+       \draw[thick,dashed,double] (rtl.south) to[bend right]
+       (proof.south) ; 
+     \end{tikzpicture}
+   \end{center}
+\only<3>{
+  \begin{theorem}[0-1 principle]
+    To prove that a (parametric) sorting network is correct, it
+    suffices to prove that it sorts all sequences of 0 and 1.      
+  \end{theorem}
+}
+\only<5>{
+  \begin{theorem}
+    Given $n$ (a bit-width), and $m$, we generate a circuit that sorts
+    $2^m$ integers of size $n$. 
+  \end{theorem}
+}
+
+\end{frame}
+\begin{frame}[fragile]
+  \frametitle{A bitonic sorter core: verification effort}
+\newcommand{\slice}[4]{
+  \pgfmathparse{0.5*#1+0.5*#2}
+  \let\midangle\pgfmathresult
+
+  % slice
+  \draw[thick,fill=black!10] (0,0) -- (#1:1) arc (#1:#2:1) -- cycle;
+
+  % outer label
+  \node[label=\midangle:#4] at (\midangle:1) {};
+
+  % inner label
+  \pgfmathparse{min((#2-#1-10)/110*(-0.3),0)}
+  \let\temp\pgfmathresult
+  \pgfmathparse{max(\temp,-0.5) + 0.8}
+  \let\innerpos\pgfmathresult
+  \node at (\midangle:\innerpos) {#3};
+}
+
+\begin{center}
+  \begin{tikzpicture}[scale=1.5]
+    \newcounter{a} \newcounter{b} 
+    \foreach \p/\t in 
+    {57/Functional Alg. and Proof, 19/0-1 principle, 8/Circ. gen., 16/Adequacy} 
+    { \setcounter{a}{\value{b}}
+      \addtocounter{b}{\p} 
+      \slice{\thea/100*360}{\theb/100*360}{\p\%}{\t} }  
+  \end{tikzpicture}
+\end{center}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Another example: a family of stack machines}
+\begin{small}
+  \begin{columns}
+\column{0.2\linewidth}
+    \begin{tabular}{rcll}
+i & ::=   & \texttt{const $n$                     }\\
+  & $|$   & \texttt{var   $x$                              }\\
+  & $|$   & \texttt{setvar  $x$                            }\\
+  & $|$   & \texttt{add                                        }\\
+  & $|$   & \texttt{sub                                        }\\
+  & $|$   & \texttt{bfwd $\delta$             }\\
+  & $|$   & \texttt{bbwd $\delta$              }\\
+  & $|$   & \texttt{bcond $c$ $\delta$ }\\
+ \\
+  & $|$   & \texttt{halt                                       }\\
+\end{tabular}
+
+\column{0.7\linewidth}
+\begin{tabular}{ll}
+$\vdash pc,\sigma,s \to pc+1, n :: \sigma,s$& \\
+$\vdash pc,\sigma,s \to pc+1, s(x) :: \sigma,s$ & \\
+$\vdash pc,v::\sigma,s \to pc+1, \sigma,s[x \leftarrow v]$ & \\
+$\vdash pc,n_2::n_1::\sigma,s \to pc+1, (n_1+n_2)::\sigma,s$&\\
+$\vdash pc,n_2::n_1::\sigma,s \to pc+1, (n_1-n_2)::\sigma,s$&\\
+$\vdash pc,\sigma,s \to pc+1+\delta, \sigma,s$ &  \\
+$\vdash pc,\sigma,s \to pc+1-\delta, \sigma,s$ & \\
+$\vdash pc,n_2::n_1::\sigma,s \to pc+1+\delta, \sigma,s$ & \text{if $c~n_1~n_2$} \\
+$\vdash pc,n_2::n_1::\sigma,s \to pc+1, \sigma,s$ & \text{if  $\neg (c~n_1~n_2)$} \\
+\texttt{no reduction}
+\end{tabular}
+\end{columns}
+\end{small}
+
+\begin{itemize}
+\item Implementation parameterized by the size of the values, the size of the
+  stack, \dots
+\end{itemize}
+\end{frame}
+
+\plan{For the practical minds}
+{
+  This was actually used to generate real Verilog code that run on real Verilog simulators
+}
+
+\begin{frame}[fragile]
+  \frametitle{Some remarks}
+  Stepping back
+  \begin{itemize}
+  \item Bluespec started as an HDL deeply embedded in Haskell
+  \item Lava [1998] is another HDL deeply embedded in Haskell
+  \item \fesi{} is ``just'' another HDL,  deeply embedded in \alert{Coq}
+    \pause
+    \begin{itemize}
+    \item semantics (i.e., interpreter), compiler and programs are \alert{integrated seamlessly}
+    \item use of computation \alert{inside} Coq to dump compiled programs
+    \item dependent types capture some interesting properties in hardware
+    \end{itemize}
+  \end{itemize}
+\end{frame}
+
+
+\plan{Conclusion}
+{
+
+  \begin{itemize}
+  \item A diagramatic presentation of circuits
+  \item A idealization of Bluespec (using PHOAS)
+  \item Used to succesfully verify parametric designs
+  \end{itemize}
+}
+
+\plan{Perspectives}
+{
+  \begin{itemize}
+  \item Use this diagramatic setting further
+  \item Use singleton types to infer plugs (G. Scherer)
+  \item Use PHOAS to embed other (non-Turing complete) languages in Coq
+    \parenthesis{GPU programming anyone?}
+  \item (For fun) understand the computational content of the proof of the 0-1 principle
+  \item Causality in circuits    
+
+  \item If time permits, let's organize a BDD aftertalk
+    \parenthesis{Or ``how we implemented four BDD libraries in Coq, and found two nifty design patterns''}
+  \end{itemize}
+}
+
+\plan{Implementations of BDDs}
+{
+  Need to be:
+  \begin{itemize}
+  \item Efficient
+  \item Verified
+  \end{itemize}
+
+  \pause
+  Problems:
+  \begin{itemize}
+  \item Maximal sharing
+  \item Memoization
   \end{itemize}
   
+  \parenthesis{Requires imperative features}
+}
+
+
+\begin{frame}{Binary decision diagrams in a nutshell}
+
+  \begin{columns}
+    \column{0.4\linewidth}
+    \begin{center}
+      \includegraphics[height=4cm]{figs/bdt-ex.pdf}
+    \end{center}
+    \column{0.4\linewidth}
+    \onslide<2->{    \begin{center}
+      \includegraphics[height=4cm]{figs/bdd-ex.pdf}
+    \end{center}
+}  \end{columns}
+  \begin{itemize}
+  \item<2-> Ensure maximum sharing by construction
+  \end{itemize}
+  \onslide<2->{\parenthesis{In a BDD, each node is associated to a unique identifier (uid).}}
+  \onslide<3->{\parenthesis{Build memoization table to save computations}}
 \end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Plan A}
+
+\begin{columns}
+    \column{0.4\linewidth}
+    \begin{center}
+      \includegraphics[height=4cm]{figs/bdd-ex.pdf}
+    \end{center}
+    \column{0.4\linewidth}
+      {\sc Encoding of the graph}
+
+      %
+      \medskip
+      %
+
+      \begin{tabular}{ccl}
+        2 & $\leftrightarrow$ & (F, T, c) \\
+        3 & $\leftrightarrow$ & (N 2, T, b) \\
+        4 & $\leftrightarrow$ & (F, N 2, b) \\
+        5 & $\leftrightarrow$ & (N 4, N 3, a) \\
+      \end{tabular}
+
+
+      \medskip
+
+      {\sc Next identifier = 6}
+  \end{columns}
+
+\pause
+  \begin{columns}
+    \column{0.5\linewidth}
+    \begin{coq}
+      Notation uid := positive.
+      Inductive expr :=
+      | T: expr
+      | F: expr
+      | N: uid -> expr.
+      Definition node := expr * expr * var.
+    \end{coq}
+    \column{0.4\linewidth}
+    \begin{block}{Embbeding global state in a monad}
+      \begin{itemize}
+      \item Next available uid
+      \item Table from uid to nodes
+      \item Table from nodes to uid
+      \item Memoization tables
+      \end{itemize}
+    \end{block}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Discussing Plan A}
+\only<1>{
+Invariants:
+\begin{itemize}
+\item Both table form a bijection
+\item All used identifiers bellow next identifier
+\item Memoization tables contain only valid information
+\item State is monotone
+\end{itemize}
+\parenthesis{Have to prove them for every operation}
+}
+\only<2>{
+Drawbacks:
+  \begin{itemize}
+  \item Monadic interface
+  \item Not modular: need to modify the monad to add features\\
+    \parenthesis{e.g. memoizing a new operator}
+  \item Non-structural recursion
+    \begin{itemize}
+    \item Well-founded recursion not easy here
+      \parenthesis{\texttt{Program Fixpoint} and \texttt{Function} not adapted}
+    \item Need some fuel ?
+    \end{itemize}
+  \item No easy garbage collection
+  \end{itemize}
+}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Plan B}
+
+  \begin{columns}
+    \column{0.5\linewidth}
+\begin{coq}
+Inductive expr := 
+| F 
+| T 
+| N : hc_expr -> hc_expr -> var -> expr
+with hc_expr := 
+HC : expr -> positive -> hc_expr.
+\end{coq}
+    \column{0.4\linewidth}
+    \begin{block}{Embbeding global state in a monad}
+      \begin{itemize}
+      \item Next available uid
+      \item Table from \coqe{expr} to \coqe{hc_expr}
+      \item Memoization tables
+      \end{itemize}
+    \end{block}
+  \end{columns}
+\end{frame}
+
+
+
+\begin{frame}{Discussing Plan B}
+\only<1>{
+Invariants:
+\begin{itemize}
+\item All used identifiers bellow next identifier
+\item Memoization tables contain only valid information
+\item State is monotone
+\end{itemize}
+\parenthesis{Have to prove them for every operation}
+}
+\only<2>{
+Drawbacks:
+  \begin{itemize}
+  \item Monadic interface
+  \item Not modular: need to modify the monad to add features\\
+    \parenthesis{e.g. memoizing a new operator}
+  \item Slightly easier garbage collection
+  \end{itemize}
+}
+\end{frame}
+
+\begin{frame}[fragile]{Plan C}
+    \begin{columns}
+  \column{0.4\linewidth}
+  \begin{block}{No sharing in Coq code}
+    \begin{coq}
+      Inductive bdd: Type :=
+      | T: bdd
+      | F: bdd
+      | N: var -> bdd -> bdd -> bdd.
+    \end{coq}
+  \end{block}
+  \column{0.45\linewidth}
+  \begin{block}{Extract N to a hash-consing constuctors}
+    In pseudo-OCaml:
+    \begin{ocaml}
+      let smartN var nT nF =
+        try HcTable.find (var, nT, nF)
+        with Not_found ->
+          let node = N var nT nF in
+          HcTable.add (var, nT, nF) node;
+          node
+    \end{ocaml}
+  \end{block}
+  \end{columns}
+  \begin{itemize}
+  \item Weak hash tables
+  \item GC for free
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Memoization without monad}
+  \begin{block}{Memoizing fixpoint combinator}
+    \begin{itemize}
+    \item Extracted to specialized OCaml code.
+    \item Well-founded to tackle complex recursion schemes.
+    \end{itemize}
+    \begin{coq}
+Definition memoFix1 := Fix (well_founded_ltof bdd bdd_size).
+
+Extract Inlined Constant memoFix1 => "Helpers.memoFix1".
+
+Program Definition bdd_not : bdd -> bdd :=
+  memoFix1 (fun b rec =>
+          match b with
+            | T => F  | F => T
+            | N v bt bf => N v (rec bt) (rec bf)
+          end).
+    \end{coq}
+  \end{block}
+\end{frame}
+
+\begin{frame}{Plan D: Exposing unique identifiers}
+  Could be needed as indices to tables
+  \begin{itemize}
+  \item Add an abstract type for unique identifiers
+  \item Axiomatizing the bijection between unique identifiers and bdd
+  \end{itemize}
+\end{frame}
+
+\plan{Conclusion}
+{
+  \textbf{Clear winners: plan B and C}
+  \begin{itemize}
+  \item Smart constructors are a breeze (proofs, efficiency after extraction, gc)
+  \item Plan B and C used to implement strong normalization in the lambda-calculus
+  \item Submitted to JAR
+  \item Question: automatic smart extraction in Coq?
+  \end{itemize}
+}
+\end{document}
+\begin{frame}{Conclusion and perspectives}
+  \begin{columns}
+    \column{0.48 \linewidth}
+    Smart constructors:
+    \begin{itemize}
+    \item are simpler (less tedious proofs)
+    \item are more efficient (after extraction)
+    \item use OCaml's garbage collector
+    \end{itemize}
+    \column{0.35 \linewidth}
+    \begin{overlayarea}{0.35\textwidth}{0.6\textheight}
+    \includegraphics<2->[height=4cm]{figs/axis.pdf}
+    \end{overlayarea}
+  \end{columns}
+  \onslide<3->{
+  \begin{center}
+    {\sc \alert{Overarching question}} \\
+    How do we add imperative features to Coq?
+  \end{center}}
+\end{frame}
+
 \end{document}
 
 \begin{frame}[fragile]
